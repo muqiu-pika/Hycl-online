@@ -24,7 +24,8 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # EdgeOne 未配置（缺站点地址 Variable）时整作业跳过，不显示为失败
+    if: ${{ vars.EDGEONE_SITE_URL != '' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

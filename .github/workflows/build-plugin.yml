@@ -1,0 +1,151 @@
+# Build the Hycl.Online plugin from the Hycl launcher source and publish it.
+# - Triggered manually (version inputs) or after Sync Terracotta (skips when the
+#   plugin release for the current version already exists, so chaining is safe).
+# - Single source of truth for the version: <Version> in the plugin csproj.
+# - After publishing, refreshes online.json (plugins[0]) and pushes; the
+#   Deploy EdgeOne workflow then picks the manifest change up automatically.
+name: Build Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      hycl_repo:
+        description: "Hycl launcher source repository"
+        default: "muqiu-pika/Hycl"
+      hycl_ref:
+        description: "Hycl source ref"
+        default: "main"
+      version:
+        description: "Plugin version override (empty = read from csproj <Version>)"
+        default: ""
+  workflow_run:
+    workflows:
+      - "Sync Terracotta"
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      published: ${{ steps.check.outputs.publish }}
+    steps:
+      - name: Checkout this repository (scripts + manifest)
+        uses: actions/checkout@v4
+
+      - name: Checkout Hycl launcher source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.hycl_repo || 'muqiu-pika/Hycl' }}
+          ref: ${{ github.event.inputs.hycl_ref || 'main' }}
+          token: ${{ secrets.HYCL_REPO_TOKEN != '' && secrets.HYCL_REPO_TOKEN || github.token }}
+          path: hycl
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolve plugin version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -e
+          csproj="hycl/src/Hycl.Launcher.Plugin.Online/Hycl.Launcher.Plugin.Online.csproj"
+          csprojVersion=$(node -e "const m=require('fs').readFileSync(process.argv[1],'utf8');const v=m.match(/<Version>([^<]+)<\/Version>/);console.log(v?v[1]:'0.0.0')" "$csproj")
+          version="${INPUT_VERSION:-$csprojVersion}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "plugin version: $version"
+
+      - name: Publish plugin
+        run: dotnet publish "hycl/src/Hycl.Launcher.Plugin.Online/Hycl.Launcher.Plugin.Online.csproj" -c Release -o publish
+
+      - name: Pack plugin zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          mkdir -p pack
+          cp publish/Hycl.Online.dll pack/
+          node -e "const fs=require('fs');fs.writeFileSync('pack/plugin.json', JSON.stringify({id:'hycl.online',name:'陶瓦联机',version:process.env.VERSION,abi:1,entry:'Hycl.Online.dll',minLauncherVersion:'1.0.0'},null,2)+'\n')"
+          (cd pack && zip -q "../Hycl.Online-$VERSION.zip" plugin.json Hycl.Online.dll)
+          ls -l "Hycl.Online-$VERSION.zip"
+
+      - name: Check whether release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "plugin-v$VERSION" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release plugin-v$VERSION already exists; skip publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release
+        if: steps.check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "plugin-v$VERSION" \
+            --title "Hycl.Online v$VERSION" \
+            --notes "Hycl 陶瓦联机插件包。安装方式：Hycl 工具页 → 插件中心。包含 plugin.json + Hycl.Online.dll；Terracotta 工具本体由清单在线下载（全平台）。" \
+            "Hycl.Online-$VERSION.zip"
+
+      - name: Refresh manifest
+        if: steps.check.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -e
+          node scripts/update-manifest.cjs plugin --zip "Hycl.Online-$VERSION.zip" --repo "$GITHUB_REPOSITORY"
+          git config user.name "hycl-online-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add online.json
+          git commit -m "chore(plugin): release v$VERSION"
+          git push
+
+  verify:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Platform coverage check (win/linux/mac x64+arm64)
+        run: |
+          node -e "
+          const m=require('./online.json');
+          const assets=m.tools&&m.tools.terracotta&&m.tools.terracotta.assets;
+          if(!assets) throw new Error('manifest missing tools.terracotta.assets');
+          const keys=Object.keys(assets).sort();
+          const need=['darwin-arm64','darwin-x64','linux-arm64','linux-x64','win-arm64','win-x64'];
+          if(JSON.stringify(keys)!==JSON.stringify(need)) throw new Error('platform coverage mismatch: '+keys.join(','));
+          for(const [key,asset] of Object.entries(assets)){
+            if(!Array.isArray(asset.urls)||!asset.urls.length) throw new Error(key+': no urls');
+            if(!/^([0-9a-f]{64})$/.test(asset.sha256||'')) throw new Error(key+': sha256 missing');
+            if(!asset.exeSha256) throw new Error(key+': exeSha256 missing');
+          }
+          console.log('platform coverage OK: '+keys.join(', '));"
+
+      - name: Primary source reachability check
+        run: |
+          node -e "
+          const m=require('./online.json');
+          for(const [key,asset] of Object.entries(m.tools.terracotta.assets)){
+            console.log(key+' -> '+asset.urls[0]);
+          }" > urls.txt
+          while IFS=' -> ' read -r key url; do
+            code=$(curl -sIL -o /dev/null -w "%{http_code}" --max-time 30 "$url")
+            echo "$key: HTTP $code"
+            case "$code" in 200|302) ;; *) echo "::warning::$key primary source returned HTTP $code";; esac
+          done < urls.txt

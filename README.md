@@ -105,12 +105,28 @@ node scripts/update-manifest.cjs apply --version 0.4.2 --report _sync/report.jso
 node scripts/update-manifest.cjs plugin --zip Hycl.Online-1.0.0.zip --repo OWNER/Hycl-online
 ```
 
-## 插件包发布流程
+## 插件包发布（全自动）
 
-1. 在 Hycl 仓库构建插件：`dotnet publish src/Hycl.Launcher.Plugin.Online -c Release`，
-   打包 `Hycl.Online-v<版本>.zip`（内容：`plugin.json` + `Hycl.Online.dll`）；
-2. `gh release create plugin-v<版本> Hycl.Online-v<版本>.zip`；
-3. `node scripts/update-manifest.cjs plugin --zip … --repo OWNER/Hycl-online` 刷新清单并提交。
+`.github/workflows/build-plugin.yml`：
+
+1. 触发：手动（可指定 Hycl 源仓库/ref/版本）**或** Sync Terracotta 完成后自动串联；
+2. 从 Hycl 仓库拉插件源码 → `dotnet publish` → 打包 `Hycl.Online-<版本>.zip`
+   （`plugin.json` + `Hycl.Online.dll`，版本号单一事实源为插件 csproj 的 `<Version>`）；
+3. `plugin-v<版本>` Release 已存在则跳过（串联安全）；不存在则创建 Release 并上传；
+4. `update-manifest.cjs plugin` 刷新 `online.json` 并提交，随后 Deploy EdgeOne 自动跟进；
+5. verify 作业校验：清单覆盖 **win/linux/mac × x64/arm64 六平台**、双 SHA-256 齐全、
+   每个平台主源 URL 可达（HEAD 200/302）。
+
+手动触发只用于插件代码更新后提前发版；日常完全自动。
+
+### 手动兜底（可选）
+
+```bash
+dotnet publish src/Hycl.Launcher.Plugin.Online -c Release
+# 打包 Hycl.Online-<版本>.zip（plugin.json + Hycl.Online.dll）
+gh release create plugin-v<版本> Hycl.Online-<版本>.zip
+node scripts/update-manifest.cjs plugin --zip Hycl.Online-<版本>.zip --repo muqiu-pika/Hycl-online
+```
 
 ## 许可
 

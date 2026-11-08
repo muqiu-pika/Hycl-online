@@ -1,0 +1,54 @@
+# Deploy the distribution site to Tencent EdgeOne Pages (China-accelerated primary source).
+# - Triggered on manifest pushes, after the Sync Terracotta workflow, or manually.
+# - Assembles dist/: tools/terracotta/<version>/*.tar.gz + plugins/*.zip + online.json
+#   (rewritten by update-manifest.cjs stage so EdgeOne URLs come first).
+# - Requires repository VARIABLE  EDGEONE_SITE_URL   e.g. https://hycl-online.edgeone.app
+#   and repository SECRET         EDGEONE_API_TOKEN  (EdgeOne Pages console -> API Token).
+name: Deploy EdgeOne
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - online.json
+  workflow_run:
+    workflows:
+      - "Sync Terracotta"
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Assemble dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EDGEONE_SITE_URL: ${{ vars.EDGEONE_SITE_URL }}
+        run: |
+          set -e
+          version=$(node -e "console.log(require('./online.json').tools.terracotta.version)")
+          mkdir -p "dist/tools/terracotta/$version" dist/plugins
+          gh release download "terracotta-v$version" -R "$GITHUB_REPOSITORY" -p "*.tar.gz" -D "dist/tools/terracotta/$version"
+          pluginVersion=$(node -e "const p=require('./online.json').plugins.find(x=>x.url); if(p) console.log(p.version)")
+          if [ -n "$pluginVersion" ]; then
+            gh release download "plugin-v$pluginVersion" -R "$GITHUB_REPOSITORY" -p "*.zip" -D dist/plugins || echo "plugin release not ready yet; skip"
+          fi
+          node scripts/update-manifest.cjs stage --dist dist
+
+      - name: Deploy to EdgeOne Pages
+        run: npx edgeone pages deploy ./dist -n hycl-online -t ${{ secrets.EDGEONE_API_TOKEN }}

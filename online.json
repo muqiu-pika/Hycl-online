@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-08T00:00:00Z",
+  "plugins": [
+    {
+      "id": "hycl.online",
+      "name": "陶瓦联机",
+      "version": "1.0.0",
+      "abi": 1,
+      "minLauncherVersion": "1.0.0",
+      "url": "",
+      "sha256": "",
+      "size": 0,
+      "description": "基于 Terracotta（burningtnt/Terracotta）的联机工具：创建/加入房间，免公网 IP 与好友联机。"
+    }
+  ],
+  "tools": {
+    "terracotta": {
+      "version": "0.4.2",
+      "upstream": "https://github.com/burningtnt/Terracotta",
+      "license": "AGPL-3.0",
+      "assets": {
+        "win-x64": {
+          "urls": [
+            "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-x86_64-pkg.tar.gz",
+            "https://gitee.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-x86_64-pkg.tar.gz",
+            "https://cnb.cool/HMCL-Terracotta/Terracotta/-/releases/download/v0.4.2/terracotta-0.4.2-windows-x86_64-pkg.tar.gz",
+            "https://mirror.ghproxy.com/https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-x86_64-pkg.tar.gz"
+          ],
+          "fileName": "terracotta-0.4.2-windows-x86_64-pkg.tar.gz",
+          "exeName": "terracotta-0.4.2-windows-x86_64.exe",
+          "sha256": "07ebe139e3ca5f74576e58b1a96efe59abdfbe148d3f1a49bfdca8b6f70745f0",
+          "exeSha256": "74c10568a7fea9c1d38cf8d2d4ca90baf1517f8e5a26c63d3349db70bc449796",
+          "size": 0
+        },
+        "win-arm64": {
+          "urls": [
+            "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-arm64-pkg.tar.gz",
+            "https://gitee.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-arm64-pkg.tar.gz",
+            "https://cnb.cool/HMCL-Terracotta/Terracotta/-/releases/download/v0.4.2/terracotta-0.4.2-windows-arm64-pkg.tar.gz",
+            "https://mirror.ghproxy.com/https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-windows-arm64-pkg.tar.gz"
+          ],
+          "fileName": "terracotta-0.4.2-windows-arm64-pkg.tar.gz",
+          "exeName": "terracotta-0.4.2-windows-arm64.exe",
+          "sha256": "acfab0a87a02dedc6dab7c05303186c8907f56f815548b693fb3324358da7d14",
+          "exeSha256": "782c2fa911488d487447694acca6b17fa68304c87023fb6814b83a167fc2845f",
+          "size": 0
+        },
+        "linux-x64": {
+          "urls": [
+            "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-linux-x86_64-pkg.tar.gz",
+            "https://gitee.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-linux-x86_64-pkg.tar.gz",
+            "https://cnb.cool/HMCL-Terracotta/Terracotta/-/releases/download/v0.4.2/terracotta-0.4.2-linux-x86_64-pkg.tar.gz",
+            "https://mirror.ghproxy.com/https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-linux-x86_64-pkg.tar.gz"
+          ],
+          "fileName": "terracotta-0.4.2-linux-x86_64-pkg.tar.gz",
+          "exeName": "terracotta-0.4.2-linux-x86_64",
+          "sha256": "675c4fd6c74d49ed8165151ba2be5b6582e0af20fb6d912074543c2484b1e10a",
+          "exeSha256": "dc8eed0338a1888743ab38468d88b9dd8a60d60c29df072adba7c8d2edaf7937",
+          "size": 0
+        },
+        "linux-arm64": {
+          "urls": [
+            "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-linux-arm64-pkg.tar.gz",
+            "https://gitee.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-linux-arm64-pkg.tar.gz",
+            "https://cnb.cool/HMCL-Terracotta/Terracotta/-/releases/download/v0.4.2/terracotta-0.4.2-linux-arm64-pkg.tar.gz",
+            "https://mirror.ghproxy.com/https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-linux-arm64-pkg.tar.gz"
+          ],
+          "fileName": "terracotta-0.4.2-linux-arm64-pkg.tar.gz",
+          "exeName": "terracotta-0.4.2-linux-arm64",
+          "sha256": "845285ff264ac5fbc16db1a1605ad190e7fa64196516068cc309de5a1d2bf66d",
+          "exeSha256": "1cc03ed2ccaab8a7b64e8eb375ccfb8c1d4cd28f4c1a242fe3b492522f9f4aad",
+          "size": 0
+        },
+        "darwin-x64": {
+          "urls": [
+            "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-macos-x86_64-pkg.tar.gz",
+            "https://gitee.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-macos-x86_64-pkg.tar.gz",
+            "https://cnb.cool/HMCL-Terracotta/Terracotta/-/releases/download/v0.4.2/terracotta-0.4.2-macos-x86_64-pkg.tar.gz",
+            "https://mirror.ghproxy.com/https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-macos-x86_64-pkg.tar.gz"
+          ],
+          "fileName": "terracotta-0.4.2-macos-x86_64-pkg.tar.gz",
+          "exeName": "terracotta-0.4.2-macos-x86_64",
+          "sha256": "16306157d89423ce79fa901cdb75a6386ec1a9b1bd43a5d47c2c47cf01a16b86",
+          "exeSha256": "07899429515f7646fd6c271acb39a2d3a34d330547b1d2682c2e3311db07aa0a",
+          "size": 0
+        },
+        "darwin-arm64": {
+          "urls": [
+            "https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-macos-arm64-pkg.tar.gz",
+            "https://gitee.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-macos-arm64-pkg.tar.gz",
+            "https://cnb.cool/HMCL-Terracotta/Terracotta/-/releases/download/v0.4.2/terracotta-0.4.2-macos-arm64-pkg.tar.gz",
+            "https://mirror.ghproxy.com/https://github.com/burningtnt/Terracotta/releases/download/v0.4.2/terracotta-0.4.2-macos-arm64-pkg.tar.gz"
+          ],
+          "fileName": "terracotta-0.4.2-macos-arm64-pkg.tar.gz",
+          "exeName": "terracotta-0.4.2-macos-arm64",
+          "sha256": "13de7f9ce8733971b23493fabbe7e16d480f1e0d16a6265b4861f5a01bbecb60",
+          "exeSha256": "14a6cfa98e841c33b552f2291b0637461f37813c0bb3d29c6b56a59cb5e6714a",
+          "size": 0
+        }
+      }
+    }
+  }
+}

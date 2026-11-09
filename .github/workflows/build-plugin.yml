@@ -98,7 +98,7 @@ jobs:
         run: |
           gh release create "plugin-v$VERSION" \
             --title "Hycl.Online v$VERSION" \
-            --notes "Hycl 陶瓦联机插件包。安装方式：Hycl 工具页 → 插件中心。包含 plugin.json + Hycl.Online.dll；Terracotta 工具本体由清单在线下载（全平台）。" \
+            --notes "Hycl 陶瓦联机插件包。安装/启用：Hycl 设置 → 插件工坊；启用后到工具页点「进入」打开功能设置页。包含 plugin.json + Hycl.Online.dll；Terracotta 工具本体由清单在线下载（全平台）。" \
             "Hycl.Online-$VERSION.zip"
 
       - name: Refresh manifest

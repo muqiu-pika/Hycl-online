@@ -8,10 +8,40 @@ Hyplay Craft Launcher（Hycl）的联机工具仓库：插件分发源 + 陶瓦�
 | --- | --- | --- |
 | 插件清单 `online.json` | 仓库根目录 | `sync-terracotta.yml` 自动 / 本地脚本手动 |
 | Terracotta 二进制（6 平台 tar.gz） | Releases（`terracotta-v*` 标签） | `sync-terracotta.yml` 每日自动同步 |
-| Hycl 联机插件包 `Hycl.Online-v*.zip` | Releases（`plugin-v*` 标签） | 本地打包后手动上传或 `update-manifest.py plugin` |
+| Hycl 联机插件包 `Hycl.Online-v*.zip` | Releases（`plugin-v*` 标签） | 本地打包后手动上传或 `update-manifest.cjs plugin` |
 
-Hycl 启动器在「工具页 → 插件中心」读取本仓库的 `online.json`（支持在设置页 → 联机与局域网
-自定义清单源地址），据此完成插件的发现、下载（SHA-256 锁定）、安装与更新。
+Hycl 启动器在「设置 → 插件工坊」读取本仓库的 `online.json`（支持在插件工坊自定义清单源地址），
+据此完成插件的发现、下载（SHA-256 锁定）、安装、更新、卸载与启用/禁用。启用的插件会出现在
+「工具」页，点「进入」打开该插件自己的功能设置页。
+
+## 插件在启动器中的呈现
+
+对照 KAMUCL（设置页管理插件、侧栏进入功能页）的三段式结构：
+
+| 位置 | 作用 |
+| --- | --- |
+| 设置 → 插件工坊 | 清单源地址、插件列表（下载 / 更新 / 卸载 / 启用 / 禁用）、安装进度、重启提示 |
+| 工具页 | 只列出**已启用**插件的入口卡（名称、版本、描述 + 「进入」） |
+| 工具页 → 进入 | 插件自己的功能设置页。陶瓦联机包含建房 / 加入 / 连接日志，以及「插件设置」折叠区（插件版本、工具版本、平台、工具目录、重新校验、修复安装） |
+
+- 启用状态写在启动器数据目录的 `plugins-state.json`，格式 `{"disabled":["<plugin id>"]}`：
+  **未记录即视为启用**（新装插件默认可用），禁用只隐藏工具页入口，卸载才会停止插件进程并删除目录。
+- 插件 ABI 仍为 **1**。v1.1.0 起插件实现可选的 `IHyclPluginFeaturePage` 声明功能页；
+  旧包（v1.0.0）未实现时宿主回退到 ABI v1 的 `CreateToolCard()`，因此旧包也能「点进去」，
+  只是没有新增的「插件设置」区。
+- 功能页控件**延迟创建**：启动加载插件时只登记工厂，用户首次点「进入」才构造控件，
+  避免启动期构造 Avalonia 控件和触发插件内部的后台校验请求。
+
+## 全平台支持
+
+| 层 | 平台处理 |
+| --- | --- |
+| 启动器本体 | Hycl 仓库 `.github/workflows/build.yml` 的 6 RID 矩阵（win / linux / mac × x64 / arm64），每个 RID 出自包含单文件与框架依赖单文件，macOS 额外打 `.app` |
+| 插件包 | `Hycl.Online.dll` 是 anycpu 托管程序集（Avalonia 12.1.4 + ABI v1 契约），**同一个 zip 供全部平台安装**，不需要分平台构建 |
+| Terracotta 工具 | `online.json` 的 `tools.terracotta.assets` 覆盖 6 平台；插件按 `HyclOnlineTools.ToolAssetKey` 选资产，Unix 上自动 `chmod +x`，包与可执行文件双 SHA-256 校验 |
+| 游戏启动 | Hycl 侧 `PlatformInfo` / `JavaDetector` 按平台选 Java、游戏目录与 classpath 分隔符，Win32 窗口注入只在 Windows 生效；macOS 的 LWJGL 2 老版本自动补 `-XstartOnFirstThread` |
+
+因此 `build-plugin.yml` 只发布一个与平台无关的插件包；`sync-terracotta.yml` 与 `deploy-edgeone.yml` 负责 6 平台二进制的同步与托管。
 
 ## 清单 schema（v1）
 
@@ -144,6 +174,12 @@ node scripts/update-manifest.cjs plugin --zip Hycl.Online-1.0.0.zip --repo OWNER
 ```
 
 ## 插件包发布（全自动）
+
+> **v1.1.0 发版注意**：本轮改动同时涉及 Hycl（插件工坊、工具页入口、可选功能页接口）与插件本体。
+> 必须先 push Hycl 源码，再在 Hycl-online 手动运行 **Build Plugin** workflow（或等待 Sync Terracotta
+> 串联触发），让 CI 用最新源码 `dotnet publish` 并创建 `plugin-v1.1.0` Release。CI 的
+> `update-manifest.cjs plugin` 会用**CI 生成的 zip** 重刷 `online.json` 的 `sha256` / `size`，
+> 覆盖本地打包的哈希；不要直接用本地 zip 的哈希冒充线上产物。之后 Deploy EdgeOne 自动跟进。
 
 `.github/workflows/build-plugin.yml`：
 

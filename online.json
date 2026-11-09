@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-08T15:00:29Z",
+  "updatedAt": "2026-11-09T07:14:52Z",
   "plugins": [
     {
       "id": "hycl.online",
       "name": "陶瓦联机",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "abi": 1,
       "minLauncherVersion": "1.0.0",
-      "url": "https://github.com/muqiu-pika/Hycl-online/releases/download/plugin-v1.0.0/Hycl.Online-1.0.0.zip",
-      "sha256": "5b0a4c9d118c50003c6eb9fbc14ad1300db84ff7512911a899481b1c2570e595",
-      "size": 42698,
+      "url": "https://github.com/muqiu-pika/Hycl-online/releases/download/plugin-v1.1.0/Hycl.Online-1.1.0.zip",
+      "sha256": "89b880d5a383295e7bff6baa4a49e568f243566715c53e58e4cac2fe4aa5c181",
+      "size": 45885,
       "description": "基于 Terracotta（burningtnt/Terracotta）的联机工具：创建/加入房间，免公网 IP 与好友联机。",
       "mirrors": []
     }

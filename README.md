@@ -68,58 +68,61 @@ Hycl 启动器在「工具页 → 插件中心」读取本仓库的 `online.json
 > 绑定自定义域名无需 ICP 备案，但没有中国大陆 CDN 节点，国内下载速度弱于国内站；主源不可用
 > 时启动器会自动降级到 GitHub 镜像池与原站，且全程有双 SHA-256 校验。
 
-### 方式 A：GitHub Actions 自动部署（推荐）
+### 部署方式：EdgeOne 控制台 Git 集成（当前使用）
 
-1. EdgeOne Pages 控制台创建 API Token，配置仓库 **Secret**：`EDGEONE_API_TOKEN`；
-2. 配置仓库 **Variable**：`EDGEONE_SITE_URL` = `https://hyclonline.mcapp.eu.org`
-   （结尾不带 `/`；项目名默认 `hycl-online`，由部署命令的 `-n` 决定）；
-3. `.github/workflows/deploy-edgeone.yml` 会在清单更新 / Sync Terracotta 完成后自动：
-   - `gh release download` 陶瓦 6 包与插件 zip 到 `dist/`（本仓库尚无 `terracotta-v*`
-     Release 时——首次部署常见，因 Sync Terracotta 只在探测到上游新版本时才建 Release——
-     自动从上游 `burningtnt/Terracotta` 同版本 Release 按清单里的 6 个 `fileName` 精确拉取）；
-   - `node scripts/update-manifest.cjs stage --dist dist` 把清单改写为 EdgeOne 优先
-     （校验文件 SHA-256，GitHub 链接保留为备用）；
-   - `npx edgeone pages deploy ./dist -n hycl-online -t ${{ secrets.EDGEONE_API_TOKEN }}`。
+项目 `hycl-online`（ID `makers-fpskvpkc0rcg`）是 **Provider `Github`** 的 Git 导入型项目，
+每次 push 到 `main` 会自动构建并发布。CLI 的 `edgeone pages deploy` 直传**不适用于此项目**：
+`getOrCreateProject ... Only projects with Provider 'Upload' are supported`（项目类型不可原地
+转换）。因此部署完全交给 Git 集成，GitHub Actions 只做独立校验。
 
-CLI 在未指定 `--site` 时按出口 IP 自动判定 API 站点；GitHub Actions runner 位于海外，会判定
-为 `global`（国际站）。若 Token 属于国内站（`china`），需在部署命令上显式加 `--site china`。
-`edgeone pages` 目前处于过渡期（官方推荐 `edgeone makers`，两者子命令等价、现有脚本不受影响），
-工作流暂沿用 `pages`；CLI 升级大版本后需回归验证。
+控制台 → 项目 → **Project Settings → Build Deployment Configuration → Edit**：
+
+| 字段 | 值 |
+| --- | --- |
+| Preset framework | `Other` |
+| Root directory | `./` |
+| Build output directory | `dist` |
+| Compile commands | `node scripts/build-dist.cjs` |
+| Install command | 留空（脚本零依赖） |
+
+> 配置改动在**下一次部署**生效。`scripts/build-dist.cjs` 按 `online.json` 的 6 个 `fileName`
+> 与 `sha256`，从 `urls`（上游 GitHub / gitee / cnb / ghproxy）多源回退下载 6 个 tar.gz，
+> 再下载插件 zip，最后调用 `update-manifest.cjs stage` 把 `dist/online.json` 改写为 EdgeOne
+> 地址优先并逐个校验哈希。站点地址取环境变量 `EDGEONE_SITE_URL`，未配置时回退到内置默认值
+> `https://hyclonline.mcapp.eu.org`。6 个包最大约 14.74 MB，低于 25 MB 单文件上限。
+
+### GitHub Actions：只校验，不部署
+
+`.github/workflows/deploy-edgeone.yml`（名字沿用 `Deploy EdgeOne`）在 `online.json` / 构建脚本
+变更或手动触发时跑同一个 `build-dist.cjs`，产出并校验 `dist/`，提供独立于 EdgeOne 的健康检查，
+**不再执行** `npx edgeone pages deploy`。仓库 **Variable** `EDGEONE_SITE_URL` 仍是必需项（stage
+改写用）；`EDGEONE_API_TOKEN` Secret 不再是部署链路的必需项（保留不影响）。
 
 ### 排障：手动 Run workflow 显示 Skipped
 
-`deploy` 作业的 `if` 要求 `vars.EDGEONE_SITE_URL != ''`。自动触发（push / workflow_run）在
-未配置时整作业跳过；手动触发会进入作业，由 `Verify EdgeOne configuration` 步骤逐项报出缺失的
-Variable / Secret，不再只显示一个 Skipped。看到 Skipped 时按顺序检查：
+`deploy` 作业的 `if` 要求 `vars.EDGEONE_SITE_URL != ''`。自动触发（push）在未配置时整作业跳过；
+手动触发会进入作业，由 `Verify EdgeOne configuration` 报出缺失的 Variable。看到 Skipped 时检查：
 
 1. **层级**：Settings → Secrets and variables → Actions → **Repository variables → New
    repository variable**（不是 Environment variables，也不是 Secrets 标签页）。GitHub 官方说明
    Environment 级变量「only available on the runner after the job starts executing」，
-   **不会进入 `vars` / `env` 上下文**；本工作流的 `if` 与 step `env` 读的是 `vars` / `secrets`，
-   且未声明 `environment:`，因此 Environment 里的同名配置完全读不到。给 job 加
-   `environment:` 也不够——step 里 `env: EDGEONE_SITE_URL: ${{ vars.EDGEONE_SITE_URL }}`
-   仍会用空的仓库级值覆盖同名 shell 变量，且环境可能带审批规则。两个配置都必须建在
-   **Repository 级**（Secret 和 Variable 都是，只挪一个不够）；
+   **不会进入 `vars` / `env` 上下文**；本工作流的 `if` 与 step `env` 读的是 `vars`，
+   且未声明 `environment:`，因此 Environment 里的同名配置完全读不到；
 2. **Name** 精确为 `EDGEONE_SITE_URL`，**Value** = `https://hyclonline.mcapp.eu.org`（结尾不带 `/`）；
-3. **Secret**：同一页面 **Repository secrets → New repository secret** → `EDGEONE_API_TOKEN`
-   （EdgeOne Pages 控制台创建）；
-4. 两者齐备后重跑，`Verify EdgeOne configuration` 应打印 `EdgeOne config OK: ...`。
+3. 配好后重跑，`Verify EdgeOne configuration` 应打印 `EdgeOne config OK: ...`。
 
-### 方式 B：控制台 Git 连接
-
-EdgeOne Pages 控制台直接连接本仓库亦可：构建命令留空、输出目录填 `dist`
-（需先在本地/CI 跑过 stage 组装出 `dist/`）——推荐方式 A，全自动。
-
-### 本地手动部署
+### 本地构建 dist（排障用）
 
 ```bash
-EDGEONE_SITE_URL=https://hyclonline.mcapp.eu.org \
-  node scripts/update-manifest.cjs stage --dist dist
-npx edgeone pages deploy ./dist -n hycl-online -t <你的Token>
+EDGEONE_SITE_URL=https://hyclonline.mcapp.eu.org node scripts/build-dist.cjs
+ls -R dist
 ```
 
-绑定自定义域名后把该地址回填到仓库 Variable `EDGEONE_SITE_URL` 和启动器常量
-`HyclOnlineSites.EdgeOneSiteUrl`，之后的 Sync Terracotta → Deploy EdgeOne → 启动器即全部自动化。
+`dist/` 被 `.gitignore` 忽略，只作为本地/构建环境产物，不进 git。触发线上部署：push 到
+`main`，或在控制台 **Build & Deploy → New Deployment** 重新构建最新提交。
+
+链路：Sync Terracotta 更新 `online.json` → push → EdgeOne Git 集成构建 `dist/` 并发布 →
+启动器从自定义域名读取清单与二进制。
 
 ## 自动同步（GitHub Actions）
 

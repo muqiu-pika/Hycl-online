@@ -1,9 +1,14 @@
-# Deploy the distribution site to Tencent EdgeOne Pages (China-accelerated primary source).
+# Deploy the distribution site to EdgeOne Pages (custom-domain primary source).
 # - Triggered on manifest pushes, after the Sync Terracotta workflow, or manually.
 # - Assembles dist/: tools/terracotta/<version>/*.tar.gz + plugins/*.zip + online.json
 #   (rewritten by update-manifest.cjs stage so EdgeOne URLs come first).
-# - Requires repository VARIABLE  EDGEONE_SITE_URL   e.g. https://hycl-online.edgeone.app
+# - Requires repository VARIABLE  EDGEONE_SITE_URL   e.g. https://hyclonline.mcapp.eu.org
+#   (MUST be the bound custom domain, NOT the *.edgeone.app preview domain:
+#    preview domains are token-gated / return 401 on mainland networks)
 #   and repository SECRET         EDGEONE_API_TOKEN  (EdgeOne Pages console -> API Token).
+# - The CLI selects the API site from the runner's egress IP when --site is omitted;
+#   GitHub Actions runners are outside mainland China -> global (international site).
+#   If the token belongs to the China site instead, add an explicit `--site china`.
 name: Deploy EdgeOne
 
 on:
@@ -24,10 +29,31 @@ permissions:
 
 jobs:
   deploy:
-    # EdgeOne 未配置（缺站点地址 Variable）时整作业跳过，不显示为失败
-    if: ${{ vars.EDGEONE_SITE_URL != '' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
+    # 自动触发且未配置站点 Variable 时整作业跳过；手动触发时进入作业并明确报出缺失项，
+    # 避免只显示 "Skipped" 无从定位。vars 可用于 job.if，secrets 不可，故 Secret 在 step 内检查。
+    if: ${{ (vars.EDGEONE_SITE_URL != '' || github.event_name == 'workflow_dispatch') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
+      - name: Verify EdgeOne configuration
+        env:
+          EDGEONE_SITE_URL: ${{ vars.EDGEONE_SITE_URL }}
+          HAS_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN != '' }}
+        run: |
+          set -e
+          missing=0
+          if [ -z "$EDGEONE_SITE_URL" ]; then
+            echo "::error::缺少仓库 Variable EDGEONE_SITE_URL。路径：Settings > Secrets and variables > Actions > Variables > New repository variable；值填 https://hyclonline.mcapp.eu.org（结尾不带 /）。注意必须是 Repository 级 Variable，不是 Environment、也不是 Secrets。"
+            missing=1
+          fi
+          if [ "$HAS_API_TOKEN" != "true" ]; then
+            echo "::error::缺少仓库 Secret EDGEONE_API_TOKEN。在 EdgeOne Pages 控制台 > API Token 创建后，填入 Settings > Secrets and variables > Actions > Secrets。"
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "EdgeOne config OK: $EDGEONE_SITE_URL"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -43,8 +69,25 @@ jobs:
         run: |
           set -e
           version=$(node -e "console.log(require('./online.json').tools.terracotta.version)")
-          mkdir -p "dist/tools/terracotta/$version" dist/plugins
-          gh release download "terracotta-v$version" -R "$GITHUB_REPOSITORY" -p "*.tar.gz" -D "dist/tools/terracotta/$version"
+          toolDir="dist/tools/terracotta/$version"
+          mkdir -p "$toolDir" dist/plugins
+          # 本仓库的 terracotta-v* Release 只在 Sync Terracotta 探测到「上游新版本」时创建，
+          # 首次部署（或版本未变化）时可能不存在。缺失/不齐时按清单里的 6 个 fileName
+          # 从上游同版本 Release 精确拉取；stage 随后逐个校验 SHA-256，来源不影响完整性。
+          if ! gh release download "terracotta-v$version" -R "$GITHUB_REPOSITORY" -p "*.tar.gz" -D "$toolDir"; then
+            needUpstream=1
+          else
+            needUpstream=0
+          fi
+          patterns=()
+          while IFS= read -r name; do
+            patterns+=(-p "$name")
+            if [ ! -f "$toolDir/$name" ]; then needUpstream=1; fi
+          done < <(node -e "const m=require('./online.json');for(const a of Object.values(m.tools.terracotta.assets))console.log(a.fileName)")
+          if [ "$needUpstream" -eq 1 ]; then
+            echo "::notice::terracotta-v$version missing or incomplete in this repo; fetching 6 packages from upstream burningtnt/Terracotta v$version"
+            gh release download "v$version" -R burningtnt/Terracotta "${patterns[@]}" --clobber -D "$toolDir"
+          fi
           pluginVersion=$(node -e "const p=require('./online.json').plugins.find(x=>x.url); if(p) console.log(p.version)")
           if [ -n "$pluginVersion" ]; then
             gh release download "plugin-v$pluginVersion" -R "$GITHUB_REPOSITORY" -p "*.zip" -D dist/plugins || echo "plugin release not ready yet; skip"
@@ -52,4 +95,6 @@ jobs:
           node scripts/update-manifest.cjs stage --dist dist
 
       - name: Deploy to EdgeOne Pages
-        run: npx edgeone pages deploy ./dist -n hycl-online -t ${{ secrets.EDGEONE_API_TOKEN }}
+        env:
+          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+        run: npx edgeone pages deploy ./dist -n hycl-online -t "$EDGEONE_API_TOKEN"

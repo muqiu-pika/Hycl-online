@@ -46,7 +46,7 @@ Hycl 启动器在「工具页 → 插件中心」读取本仓库的 `online.json
 
 启动器对 GitHub 文件的下载策略（自动换源，GitHub 原站永远托底）：
 
-1. **EdgeOne 托管源**（已部署时自动排第一，国内 CDN 直连）
+1. **EdgeOne 托管源**（已部署时自动排第一，走绑定的自定义域名 `hyclonline.mcapp.eu.org`）
 2. **官方镜像**（terracotta 专有：gitee / cnb.cool）
 3. **GitHub 加速镜像池**（内置 5 个，按实测延迟自动排序，失败沉底）：
    `gh-proxy.com` → `ghfast.top` → `ghproxy.link` → `ghproxy.net` → `mirror.ghproxy.com`
@@ -55,20 +55,55 @@ Hycl 启动器在「工具页 → 插件中心」读取本仓库的 `online.json
 镜像池在启动器内每 10 分钟后台探测一次（HEAD + 2.5s 超时），按响应时间重排；镜像域名失效
 无需更新启动器（自动沉底）。初始顺序为 2026-11-08 实测（阿里 DoH 解析 + 真实文件拉取）。
 
-## EdgeOne Pages 托管（国内加速主源）
+## EdgeOne Pages 托管（自定义域名主源）
 
-把清单与全部二进制托管到腾讯云 EdgeOne Pages，国内用户直连 CDN，不再依赖 GitHub：
+把清单与全部二进制托管到 EdgeOne Pages，作为启动器下载的主源；GitHub Release、官方镜像与
+启动器镜像池保留为兜底。当前站点为 **`https://hyclonline.mcapp.eu.org`**。
+
+> **必做：绑定自定义域名。** Pages 默认的项目域名 / 部署域名不是稳定公开入口——加速区域
+> 含中国大陆时须使用系统生成的预览链接（有效期 3 小时，超时返回 401）；加速区域为
+> 「全球可用区（不含中国大陆）」时，中国大陆网络直接返回 401。因此仓库 Variable
+> `EDGEONE_SITE_URL` 与启动器 `HyclOnlineSites.EdgeOneSiteUrl` 都必须填这个自定义域名，
+> **不要填 `*.edgeone.app` 等预览域名**（该域名格式属于国际站）。全球可用区（不含中国大陆）
+> 绑定自定义域名无需 ICP 备案，但没有中国大陆 CDN 节点，国内下载速度弱于国内站；主源不可用
+> 时启动器会自动降级到 GitHub 镜像池与原站，且全程有双 SHA-256 校验。
 
 ### 方式 A：GitHub Actions 自动部署（推荐）
 
 1. EdgeOne Pages 控制台创建 API Token，配置仓库 **Secret**：`EDGEONE_API_TOKEN`；
-2. 配置仓库 **Variable**：`EDGEONE_SITE_URL`（部署后的站点地址，如
-   `https://hycl-online.edgeone.app`，项目名默认 `hycl-online`，可在命令里改）；
+2. 配置仓库 **Variable**：`EDGEONE_SITE_URL` = `https://hyclonline.mcapp.eu.org`
+   （结尾不带 `/`；项目名默认 `hycl-online`，由部署命令的 `-n` 决定）；
 3. `.github/workflows/deploy-edgeone.yml` 会在清单更新 / Sync Terracotta 完成后自动：
-   - `gh release download` 陶瓦 6 包与插件 zip 到 `dist/`；
+   - `gh release download` 陶瓦 6 包与插件 zip 到 `dist/`（本仓库尚无 `terracotta-v*`
+     Release 时——首次部署常见，因 Sync Terracotta 只在探测到上游新版本时才建 Release——
+     自动从上游 `burningtnt/Terracotta` 同版本 Release 按清单里的 6 个 `fileName` 精确拉取）；
    - `node scripts/update-manifest.cjs stage --dist dist` 把清单改写为 EdgeOne 优先
      （校验文件 SHA-256，GitHub 链接保留为备用）；
    - `npx edgeone pages deploy ./dist -n hycl-online -t ${{ secrets.EDGEONE_API_TOKEN }}`。
+
+CLI 在未指定 `--site` 时按出口 IP 自动判定 API 站点；GitHub Actions runner 位于海外，会判定
+为 `global`（国际站）。若 Token 属于国内站（`china`），需在部署命令上显式加 `--site china`。
+`edgeone pages` 目前处于过渡期（官方推荐 `edgeone makers`，两者子命令等价、现有脚本不受影响），
+工作流暂沿用 `pages`；CLI 升级大版本后需回归验证。
+
+### 排障：手动 Run workflow 显示 Skipped
+
+`deploy` 作业的 `if` 要求 `vars.EDGEONE_SITE_URL != ''`。自动触发（push / workflow_run）在
+未配置时整作业跳过；手动触发会进入作业，由 `Verify EdgeOne configuration` 步骤逐项报出缺失的
+Variable / Secret，不再只显示一个 Skipped。看到 Skipped 时按顺序检查：
+
+1. **层级**：Settings → Secrets and variables → Actions → **Repository variables → New
+   repository variable**（不是 Environment variables，也不是 Secrets 标签页）。GitHub 官方说明
+   Environment 级变量「only available on the runner after the job starts executing」，
+   **不会进入 `vars` / `env` 上下文**；本工作流的 `if` 与 step `env` 读的是 `vars` / `secrets`，
+   且未声明 `environment:`，因此 Environment 里的同名配置完全读不到。给 job 加
+   `environment:` 也不够——step 里 `env: EDGEONE_SITE_URL: ${{ vars.EDGEONE_SITE_URL }}`
+   仍会用空的仓库级值覆盖同名 shell 变量，且环境可能带审批规则。两个配置都必须建在
+   **Repository 级**（Secret 和 Variable 都是，只挪一个不够）；
+2. **Name** 精确为 `EDGEONE_SITE_URL`，**Value** = `https://hyclonline.mcapp.eu.org`（结尾不带 `/`）；
+3. **Secret**：同一页面 **Repository secrets → New repository secret** → `EDGEONE_API_TOKEN`
+   （EdgeOne Pages 控制台创建）；
+4. 两者齐备后重跑，`Verify EdgeOne configuration` 应打印 `EdgeOne config OK: ...`。
 
 ### 方式 B：控制台 Git 连接
 
@@ -78,13 +113,13 @@ EdgeOne Pages 控制台直接连接本仓库亦可：构建命令留空、输出
 ### 本地手动部署
 
 ```bash
-EDGEONE_SITE_URL=https://hycl-online.edgeone.app \
+EDGEONE_SITE_URL=https://hyclonline.mcapp.eu.org \
   node scripts/update-manifest.cjs stage --dist dist
 npx edgeone pages deploy ./dist -n hycl-online -t <你的Token>
 ```
 
-部署完成后把站点地址回填到仓库 Variable `EDGEONE_SITE_URL`，之后的 Sync Terracotta
-→ Deploy EdgeOne → 启动器即全部自动化。
+绑定自定义域名后把该地址回填到仓库 Variable `EDGEONE_SITE_URL` 和启动器常量
+`HyclOnlineSites.EdgeOneSiteUrl`，之后的 Sync Terracotta → Deploy EdgeOne → 启动器即全部自动化。
 
 ## 自动同步（GitHub Actions）
 

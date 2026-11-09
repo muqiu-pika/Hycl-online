@@ -229,7 +229,7 @@ function cmdPlugin(args) {
 function cmdStage(args) {
   const site = resolveSiteUrl(args["site-url"]);
   if (!site) {
-    fail("EdgeOne site URL is required: pass --site-url https://<project>.edgeone.app or set EDGEONE_SITE_URL");
+    fail("EdgeOne site URL is required: pass --site-url https://hyclonline.mcapp.eu.org or set EDGEONE_SITE_URL");
   }
   const dist = path.resolve(args.dist ?? "dist");
   const sourceManifest = args.manifest

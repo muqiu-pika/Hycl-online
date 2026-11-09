@@ -18,8 +18,10 @@ on:
       - main
     paths:
       - online.json
+      - public-nodes.enc
       - scripts/build-dist.cjs
       - scripts/update-manifest.cjs
+      - scripts/sync-public-nodes.cjs
 
 permissions:
   contents: read

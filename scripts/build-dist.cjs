@@ -97,6 +97,17 @@ async function main() {
   fs.mkdirSync(toolDir, { recursive: true });
   fs.mkdirSync(pluginDir, { recursive: true });
 
+  // Community EasyTier nodes: only the AES-256-GCM ciphertext is committed and
+  // served by EdgeOne at <site>/public-nodes.enc. The plugin decrypts it locally;
+  // the plaintext JSON never enters the repository or dist.
+  const publicNodes = path.join(ROOT, "public-nodes.enc");
+  if (fs.existsSync(publicNodes)) {
+    fs.copyFileSync(publicNodes, path.join(DIST, "public-nodes.enc"));
+    log("staged public-nodes.enc");
+  } else {
+    log("WARN public-nodes.enc missing; community node list will not be served");
+  }
+
   for (const [key, asset] of Object.entries(tool.assets || {})) {
     const name = String(asset.fileName || "");
     if (!name) {

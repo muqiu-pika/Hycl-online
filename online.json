@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-11-09T09:02:15Z",
+  "publicNodesUrl": "https://hyclonline.mcapp.eu.org/public-nodes.enc",
   "plugins": [
     {
       "id": "hycl.online",

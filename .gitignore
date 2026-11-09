@@ -10,3 +10,7 @@ _sync/
 # OS
 Thumbs.db
 .DS_Store
+
+# 节点清单加密种子（仅本地 / GitHub Secrets 保存，绝不提交）
+.nodes.seed
+*public-nodes.seed

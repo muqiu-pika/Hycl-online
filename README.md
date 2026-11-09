@@ -7,8 +7,42 @@ Hyplay Craft Launcher（Hycl）的联机工具仓库：插件分发源 + 陶瓦�
 | 内容 | 位置 | 谁来更新 |
 | --- | --- | --- |
 | 插件清单 `online.json` | 仓库根目录 | `sync-terracotta.yml` 自动 / 本地脚本手动 |
+| 社区节点清单（密文）`public-nodes.enc` | 仓库根目录 + EdgeOne `dist/` | 本地 `scripts/sync-public-nodes.cjs` |
 | Terracotta 二进制（6 平台 tar.gz） | Releases（`terracotta-v*` 标签） | `sync-terracotta.yml` 每日自动同步 |
 | Hycl 联机插件包 `Hycl.Online-v*.zip` | Releases（`plugin-v*` 标签） | 本地打包后手动上传或 `update-manifest.cjs plugin` |
+
+### 社区节点清单
+
+节点清单以 **AES-256-GCM 密文**保存，仓库与 EdgeOne 上都只有 `public-nodes.enc`，
+明文 JSON 只在内存中转瞬出现、从不落盘。EdgeOne 上的地址：
+
+```
+https://hyclonline.mcapp.eu.org/public-nodes.enc
+```
+
+`online.json` 顶层 `publicNodesUrl` 指向该地址；插件建房/加入前拉取密文、本地解密，
+再把全部节点通过 `public_nodes` 参数附加给陶瓦（与内置节点合并）。
+这一步是必要的：陶瓦 v0.4.2 内置的 4 个节点里 `tcp://public.easytier.top:11010` 与
+`tcp://public2.easytier.cn:54321` 已 DNS 失效，仅靠内置节点常出现「等待房间号超时」。
+
+**密钥不进入仓库**。加密种子通过环境变量传入，Hycl 插件侧用同一套派生逻辑
+（`SHA-256(seed + "|hycl.online|nodes")`）得到 AES-256 密钥：
+
+```bash
+HYCL_NODES_SEED=<seed> node scripts/sync-public-nodes.cjs --from /path/to/win-dhcp.toml
+```
+
+重新提取时**只导出 peer URI、分组与行尾注释**；`network_identity` / `network_secret`
+等凭据不会写入任何产物。失效节点按需求原样保留，不做过滤——Terracotta 自己会跳过不可达 peer。
+
+> **安全边界（务必理解）**：客户端必须能解密，密钥就必然存在于客户端二进制中，
+> 而 Hycl 是公开仓库。因此这层加密的目标是「不出现明文、防爬虫与随手复制、防 GitHub 搜索」，
+> 不是密码学意义上的保密。任何运行客户端的人逆向后都能取出节点列表。
+> 若需要真正的访问控制，只能把节点下发改为**服务端代理**（EdgeOne Function / Worker 校验
+> 请求签名或设备指纹后再返回），客户端不再持有节点数据——需要的话可以另开一轮实现。
+>
+> 轮换方式：换一个 `HYCL_NODES_SEED` 重新生成 `public-nodes.enc`，同时更新 Hycl 插件里的
+> `PublicNodesProvider.KeyParts` 分片常量并重新发版；旧客户端会因为 GCM 校验失败而回退到内置节点。
 
 Hycl 启动器在「设置 → 插件工坊」读取本仓库的 `online.json`（支持在插件工坊自定义清单源地址），
 据此完成插件的发现、下载（SHA-256 锁定）、安装、更新、卸载与启用/禁用。启用的插件会出现在

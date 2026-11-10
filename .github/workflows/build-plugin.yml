@@ -30,16 +30,16 @@ permissions:
 jobs:
   build:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       published: ${{ steps.check.outputs.publish }}
     steps:
       - name: Checkout this repository (scripts + manifest)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout Hycl launcher source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ github.event.inputs.hycl_repo || 'muqiu-pika/Hycl' }}
           ref: ${{ github.event.inputs.hycl_ref || 'main' }}
@@ -47,7 +47,7 @@ jobs:
           path: hycl
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
@@ -116,10 +116,10 @@ jobs:
 
   verify:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Platform coverage check (win/linux/mac x64+arm64)
         run: |

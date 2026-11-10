@@ -30,7 +30,7 @@ jobs:
   deploy:
     # 自动触发且未配置站点 Variable 时整作业跳过；手动触发时进入作业并明确报出缺失项。
     if: ${{ vars.EDGEONE_SITE_URL != '' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Verify EdgeOne configuration
         env:
@@ -44,10 +44,10 @@ jobs:
           echo "EdgeOne config OK: $EDGEONE_SITE_URL"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 

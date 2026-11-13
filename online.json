@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-13T00:00:00Z",
+  "updatedAt": "2026-11-14T00:20:00Z",
   "publicNodesUrl": "https://hyclonline.mcapp.eu.org/public-nodes.enc",
   "plugins": [
     {
       "id": "hycl.online",
       "name": "陶瓦联机",
-      "version": "1.3.1",
+      "version": "1.3.2",
       "abi": 1,
       "minLauncherVersion": "1.0.0",
-      "url": "https://github.com/muqiu-pika/Hycl-online/releases/download/plugin-v1.3.1/Hycl.Online-1.3.1.zip",
-      "sha256": "e8b15bb50042481d34a1f8ed4693fda5607d10b56694936bee815e13e920bddc",
-      "size": 58765,
-      "description": "基于 Terracotta（burningtnt/Terracotta）的联机工具：创建/加入房间，免公网 IP 与好友联机。",
+      "url": "https://github.com/muqiu-pika/Hycl-online/releases/download/plugin-v1.3.2/Hycl.Online-1.3.2.zip",
+      "sha256": "7d7e4e60c9168ed7d3019cf7ddef9ddd28486f81fbb8a1aa2beee53f5cffafa0",
+      "size": 57202,
+      "description": "基于 Terracotta（burningtnt/Terracotta）的联机工具：创建/加入房间，免公网 IP 与好友联机。1.3.2：适配启动器契约重构（工具镜像链内置），修复旧包在新启动器上陶瓦卡「正在检查」不就绪的问题。",
       "mirrors": []
     }
   ]

@@ -1,10 +1,8 @@
 # Visual Studio cache
 .vs/
 
-# Local staging / deploy output（二进制与插件包只进 Release，不进 git）
+# Local staging / deploy output（插件包只进 Release，不进 git）
 dist/
-_sync/
-*.tar.gz
 *.zip
 
 # OS

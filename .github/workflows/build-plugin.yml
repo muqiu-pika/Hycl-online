@@ -1,6 +1,5 @@
 # Build the Hycl.Online plugin from the Hycl launcher source and publish it.
-# - Triggered manually (version inputs) or after Sync Terracotta (skips when the
-#   plugin release for the current version already exists, so chaining is safe).
+# - Triggered manually (version inputs); no longer chained to a Terracotta sync job.
 # - Single source of truth for the version: <Version> in the plugin csproj.
 # - After publishing, refreshes online.json (plugins[0]) and pushes; the
 #   Deploy EdgeOne workflow then picks the manifest change up automatically.
@@ -18,18 +17,12 @@ on:
       version:
         description: "Plugin version override (empty = read from csproj <Version>)"
         default: ""
-  workflow_run:
-    workflows:
-      - "Sync Terracotta"
-    types:
-      - completed
 
 permissions:
   contents: write
 
 jobs:
   build:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -98,7 +91,7 @@ jobs:
         run: |
           gh release create "plugin-v$VERSION" \
             --title "Hycl.Online v$VERSION" \
-            --notes "Hycl 陶瓦联机插件包。安装/启用：Hycl 设置 → 插件工坊；启用后到工具页点「进入」打开功能设置页。包含 plugin.json + Hycl.Online.dll；Terracotta 工具本体由清单在线下载（全平台）。" \
+            --notes "Hycl 陶瓦联机插件包。安装/启用：Hycl 设置 → 插件工坊；启用后到工具页点「进入」打开功能设置页。包含 plugin.json + Hycl.Online.dll；Terracotta 工具本体由插件从官方镜像与官方仓库在线下载（全平台）。" \
             "Hycl.Online-$VERSION.zip"
 
       - name: Refresh manifest
@@ -121,30 +114,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Platform coverage check (win/linux/mac x64+arm64)
+      - name: Plugin entry check
         run: |
           node -e "
           const m=require('./online.json');
-          const assets=m.tools&&m.tools.terracotta&&m.tools.terracotta.assets;
-          if(!assets) throw new Error('manifest missing tools.terracotta.assets');
-          const keys=Object.keys(assets).sort();
-          const need=['darwin-arm64','darwin-x64','linux-arm64','linux-x64','win-arm64','win-x64'];
-          if(JSON.stringify(keys)!==JSON.stringify(need)) throw new Error('platform coverage mismatch: '+keys.join(','));
-          for(const [key,asset] of Object.entries(assets)){
-            if(!Array.isArray(asset.urls)||!asset.urls.length) throw new Error(key+': no urls');
-            if(!/^([0-9a-f]{64})$/.test(asset.sha256||'')) throw new Error(key+': sha256 missing');
-            if(!asset.exeSha256) throw new Error(key+': exeSha256 missing');
-          }
-          console.log('platform coverage OK: '+keys.join(', '));"
+          const p=(m.plugins||[]).find(item=>item.id==='hycl.online');
+          if(!p) throw new Error('manifest missing plugins[hycl.online]');
+          if(!p.version) throw new Error('plugin version missing');
+          if(!/^([0-9a-f]{64})$/.test(p.sha256||'')) throw new Error('plugin sha256 missing');
+          if(!(Number(p.size)>0)) throw new Error('plugin size missing');
+          if(!/^https:\/\//.test(p.url||'')) throw new Error('plugin url missing');
+          for(const url of [p.url, ...(p.mirrors||[])]) new URL(url);
+          console.log('plugin entry OK: v'+p.version+' '+p.url);"
 
       - name: Primary source reachability check
         run: |
           node --input-type=module -e "
           import { readFileSync } from 'node:fs';
           const m = JSON.parse(readFileSync('./online.json', 'utf8'));
+          const p = (m.plugins || []).find(item => item.id === 'hycl.online');
+          const urls = [p?.url, ...(p?.mirrors || [])].filter(Boolean);
+          if (!urls.length) throw new Error('no plugin urls');
           const bad = [];
-          for (const [key, asset] of Object.entries(m.tools.terracotta.assets)) {
-            const url = asset.urls[0];
+          for (const url of urls) {
             let status = 0;
             try {
               let res = await fetch(url, { method: 'HEAD' });
@@ -155,14 +147,14 @@ jobs:
               }
               status = res.status;
             } catch (error) {
-              bad.push(key + ': network error ' + error.message);
+              bad.push(url + ': network error ' + error.message);
               continue;
             }
-            console.log(key + ': HTTP ' + status + '  ' + url);
-            if (![200, 206, 302, 303].includes(status)) bad.push(key + ': HTTP ' + status);
+            console.log('HTTP ' + status + '  ' + url);
+            if (![200, 206, 302, 303].includes(status)) bad.push(url + ': HTTP ' + status);
           }
           if (bad.length) {
-            console.error('unreachable primary sources:\n' + bad.join('\n'));
+            console.error('unreachable plugin sources:\n' + bad.join('\n'));
             process.exit(1);
           }
-          console.log('primary sources reachable');"
+          console.log('plugin sources reachable');"

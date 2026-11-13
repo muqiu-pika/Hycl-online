@@ -1,4 +1,6 @@
 # Verify the distribution bundle for the EdgeOne Pages site (custom-domain primary source).
+# The site hosts the plugin manifest, the plugin packages and the encrypted community
+# node list. Terracotta packages are NOT hosted here (the plugin uses official sources).
 # Actual deployment is handled by the EdgeOne Pages Git-connected project:
 #   Build command:      node scripts/build-dist.cjs
 #   Build output dir:   dist
@@ -21,7 +23,6 @@ on:
       - public-nodes.enc
       - scripts/build-dist.cjs
       - scripts/update-manifest.cjs
-      - scripts/sync-public-nodes.cjs
 
 permissions:
   contents: read

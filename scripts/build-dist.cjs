@@ -4,7 +4,10 @@
 // The Git-connected project publishes a build output directory instead of pushing
 // artifacts through the CLI (the project has Provider 'Github', so direct folder/zip
 // deployment is not supported). This script assembles dist/:
-//   tools/terracotta/<version>/*.tar.gz + plugins/*.zip + online.json (EdgeOne-first).
+//   plugins/*.zip + public-nodes.enc + online.json (EdgeOne-first).
+//
+// Terracotta packages are NOT mirrored here: the plugin downloads them from the
+// official mirrors / official GitHub repository only.
 //
 // Build command:   node scripts/build-dist.cjs
 // Output directory: dist
@@ -86,15 +89,9 @@ async function download(urls, expectedSha256) {
 
 async function main() {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "online.json"), "utf8"));
-  const tool = manifest.tools && manifest.tools.terracotta;
-  if (!tool || !tool.version) {
-    throw new Error("manifest has no tools.terracotta.version");
-  }
 
   const site = String(process.env.EDGEONE_SITE_URL || DEFAULT_SITE).trim().replace(/\/+$/, "");
-  const toolDir = path.join(DIST, "tools", "terracotta", String(tool.version));
   const pluginDir = path.join(DIST, "plugins");
-  fs.mkdirSync(toolDir, { recursive: true });
   fs.mkdirSync(pluginDir, { recursive: true });
 
   // Community EasyTier nodes: only the AES-256-GCM ciphertext is committed and
@@ -108,16 +105,6 @@ async function main() {
     log("WARN public-nodes.enc missing; community node list will not be served");
   }
 
-  for (const [key, asset] of Object.entries(tool.assets || {})) {
-    const name = String(asset.fileName || "");
-    if (!name) {
-      throw new Error(key + ": no fileName");
-    }
-    log("downloading " + name);
-    const data = await download(expandMirrors(asset.urls || []), asset.sha256);
-    fs.writeFileSync(path.join(toolDir, name), data);
-  }
-
   for (const entry of manifest.plugins || []) {
     if (!entry.url) {
       continue;
@@ -128,7 +115,7 @@ async function main() {
       fs.writeFileSync(path.join(pluginDir, name), data);
       log("downloaded " + name);
     } catch (error) {
-      // A missing plugin zip must not break the tool packages; stage keeps GitHub as fallback.
+      // A missing plugin zip must not break the site; stage keeps GitHub as fallback.
       log("WARN plugin not available, skipping rewrite: " + error.message);
     }
   }
